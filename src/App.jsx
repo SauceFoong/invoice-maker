@@ -16,7 +16,11 @@ const App = () => {
       { id: 1, description: 'Domain Renewal Fee (1 year)', amount: 140.00 },
       { id: 2, description: 'Hosting Renewal Fee (1 year)', amount: 550.00 },
     ],
-    terms: 'Payment is due within 15 days'
+    terms: 'Payment is due within 15 days',
+    // Fixed price mode - shows items without individual prices, just a total
+    fixedPriceMode: false,
+    fixedTotal: 0,
+    additionalNotes: '' // e.g., "Timeline: 5 working days"
   });
 
   // --- Helper Functions ---
@@ -38,6 +42,9 @@ const App = () => {
 
   // Calculate Total
   const calculateTotal = () => {
+    if (invoiceData.fixedPriceMode) {
+      return parseFloat(invoiceData.fixedTotal || 0).toFixed(2);
+    }
     return invoiceData.items.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0).toFixed(2);
   };
 
@@ -183,6 +190,52 @@ const App = () => {
             </div>
           </div>
 
+          {/* Pricing Mode Toggle */}
+          <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-amber-800">Fixed Price Mode</h3>
+                <p className="text-xs text-amber-600 mt-1">List items without individual prices, show only total</p>
+              </div>
+              <button
+                onClick={() => setInvoiceData(prev => ({ ...prev, fixedPriceMode: !prev.fixedPriceMode }))}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${invoiceData.fixedPriceMode ? 'bg-amber-500' : 'bg-gray-300'}`}
+              >
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${invoiceData.fixedPriceMode ? 'translate-x-5' : 'translate-x-0'}`} />
+              </button>
+            </div>
+            
+            {invoiceData.fixedPriceMode && (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-amber-800 mb-1">Total Amount</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-amber-700">{invoiceData.currency}</span>
+                    <input
+                      type="number"
+                      name="fixedTotal"
+                      value={invoiceData.fixedTotal}
+                      onChange={handleInputChange}
+                      placeholder="2500.00"
+                      className="flex-1 px-3 py-2 border border-amber-300 rounded-md focus:ring-amber-500 focus:border-amber-500 bg-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-amber-800 mb-1">Additional Notes (e.g., Timeline)</label>
+                  <textarea
+                    name="additionalNotes"
+                    value={invoiceData.additionalNotes}
+                    onChange={handleInputChange}
+                    placeholder="Timeline: 5 working days"
+                    rows="2"
+                    className="w-full px-3 py-2 border border-amber-300 rounded-md focus:ring-amber-500 focus:border-amber-500 bg-white"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Line Items Editor */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -195,26 +248,29 @@ const App = () => {
                </button>
             </div>
             
-            {invoiceData.items.map((item) => (
+            {invoiceData.items.map((item, index) => (
               <div key={item.id} className="flex gap-2 items-start bg-white p-2 border border-gray-200 rounded-md shadow-sm">
+                <span className="text-xs text-gray-400 mt-2 w-5">{index + 1}.</span>
                 <div className="flex-grow">
                   <input
                     type="text"
                     value={item.description}
                     onChange={(e) => handleItemChange(item.id, 'description', e.target.value)}
                     placeholder="Description"
-                    className="w-full p-1 text-sm border-b border-gray-200 focus:border-indigo-500 outline-none mb-1"
+                    className={`w-full p-1 text-sm border-b border-gray-200 focus:border-indigo-500 outline-none ${invoiceData.fixedPriceMode ? '' : 'mb-1'}`}
                   />
-                  <div className="flex items-center gap-2">
-                     <span className="text-xs text-gray-400">{invoiceData.currency}</span>
-                     <input
-                      type="number"
-                      value={item.amount}
-                      onChange={(e) => handleItemChange(item.id, 'amount', e.target.value)}
-                      placeholder="0.00"
-                      className="w-full p-1 text-sm outline-none"
-                    />
-                  </div>
+                  {!invoiceData.fixedPriceMode && (
+                    <div className="flex items-center gap-2">
+                       <span className="text-xs text-gray-400">{invoiceData.currency}</span>
+                       <input
+                        type="number"
+                        value={item.amount}
+                        onChange={(e) => handleItemChange(item.id, 'amount', e.target.value)}
+                        placeholder="0.00"
+                        className="w-full p-1 text-sm outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
                 <button 
                   onClick={() => removeItem(item.id)}
@@ -310,37 +366,69 @@ const App = () => {
 
             {/* Items Table */}
             <div className="mb-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr>
-                    <th className="py-4 px-2 border-b-2 border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="py-4 px-2 border-b-2 border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider text-right w-40">Amount ({invoiceData.currency})</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {invoiceData.items.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-4 px-2 border-b border-gray-100 text-gray-900">{item.description}</td>
-                      <td className="py-4 px-2 border-b border-gray-100 text-gray-900 text-right font-medium">
-                        {parseFloat(item.amount || 0).toFixed(2)}
+              {invoiceData.fixedPriceMode ? (
+                /* Fixed Price Mode - List style without amounts */
+                <div>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 pb-2 border-b-2 border-gray-200">Scope of Work</h3>
+                  <ol className="space-y-3 text-sm text-gray-900">
+                    {invoiceData.items.map((item, index) => (
+                      <li key={item.id} className="flex gap-3 py-2 border-b border-gray-100">
+                        <span className="text-gray-500 font-medium">{index + 1}.</span>
+                        <span className="flex-1">{item.description}</span>
+                      </li>
+                    ))}
+                    {invoiceData.items.length === 0 && (
+                      <li className="py-8 text-center text-gray-400 italic">No items added yet.</li>
+                    )}
+                  </ol>
+                  
+                  {/* Total Offer Section */}
+                  <div className="mt-8 pt-6 border-t-2 border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">Total Offer</span>
+                      <span className="text-2xl font-bold text-indigo-600">
+                        {invoiceData.currency} {calculateTotal()}
+                      </span>
+                    </div>
+                    {invoiceData.additionalNotes && (
+                      <p className="mt-3 text-sm text-gray-600 whitespace-pre-wrap">{invoiceData.additionalNotes}</p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Regular Mode - Table with amounts */
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="py-4 px-2 border-b-2 border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="py-4 px-2 border-b-2 border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider text-right w-40">Amount ({invoiceData.currency})</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {invoiceData.items.map((item) => (
+                      <tr key={item.id}>
+                        <td className="py-4 px-2 border-b border-gray-100 text-gray-900">{item.description}</td>
+                        <td className="py-4 px-2 border-b border-gray-100 text-gray-900 text-right font-medium">
+                          {parseFloat(item.amount || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                    {invoiceData.items.length === 0 && (
+                      <tr>
+                        <td colSpan="2" className="py-8 text-center text-gray-400 italic">No items added yet.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td className="pt-6 px-2 text-right text-sm font-bold text-gray-900">Total</td>
+                      <td className="pt-6 px-2 text-right text-lg font-bold text-gray-900">
+                        {invoiceData.currency} {calculateTotal()}
                       </td>
                     </tr>
-                  ))}
-                  {invoiceData.items.length === 0 && (
-                    <tr>
-                      <td colSpan="2" className="py-8 text-center text-gray-400 italic">No items added yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td className="pt-6 px-2 text-right text-sm font-bold text-gray-900">Total</td>
-                    <td className="pt-6 px-2 text-right text-lg font-bold text-gray-900">
-                      {invoiceData.currency} {calculateTotal()}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </tfoot>
+                </table>
+              )}
             </div>
 
             {/* Terms */}
